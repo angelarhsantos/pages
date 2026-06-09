@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -38,10 +38,82 @@ jobs:
         run: npx playwright test
         continue-on-error: true
 
-      - name: Upload Playwright report
+      - name: Save report history
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin reports >/dev/null 2>&1; then
+            git fetch origin reports:reports
+            git worktree add reports-history reports
+          else
+            git worktree add --detach reports-history
+            cd reports-history
+            git checkout --orphan reports
+            git rm -rf . >/dev/null 2>&1 || true
+            cd ..
+          fi
+
+          short_sha="${GITHUB_SHA::7}"
+          run_dir="runs/${GITHUB_RUN_NUMBER}-${short_sha}"
+
+          mkdir -p "reports-history/${run_dir}"
+          cp -R playwright-report/. "reports-history/${run_dir}/"
+
+          cd reports-history
+
+          mkdir -p runs
+          mapfile -t saved_runs < <(find runs -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -t- -k1,1nr)
+
+          for old_run in "${saved_runs[@]:10}"; do
+            rm -rf "runs/${old_run}"
+          done
+
+          mapfile -t saved_runs < <(find runs -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -t- -k1,1nr)
+
+          {
+            echo '<!doctype html>'
+            echo '<html lang="en">'
+            echo '<head>'
+            echo '  <meta charset="utf-8">'
+            echo '  <meta name="viewport" content="width=device-width, initial-scale=1">'
+            echo '  <title>Playwright Reports</title>'
+            echo '</head>'
+            echo '<body>'
+            echo '  <h1>Playwright Reports</h1>'
+            echo '  <p>Last 10 executions from main.</p>'
+            echo '  <ol>'
+            for saved_run in "${saved_runs[@]}"; do
+              run_number="${saved_run%%-*}"
+              sha="${saved_run#*-}"
+              echo "    <li><a href=\"runs/${saved_run}/index.html\">Run #${run_number}</a> (${sha})</li>"
+            done
+            echo '  </ol>'
+            echo '</body>'
+            echo '</html>'
+          } > index.html
+
+          touch .nojekyll
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No report history changes to commit."
+          else
+            git commit -m "Save Playwright report for run ${GITHUB_RUN_NUMBER}"
+            git push origin HEAD:reports
+          fi
+
+          cd ..
+          mkdir -p pages-artifact
+          cp -R reports-history/. pages-artifact/
+          rm -f pages-artifact/.git
+
+      - name: Upload report history
         uses: actions/upload-pages-artifact@v3
         with:
-          path: playwright-report
+          path: pages-artifact
 
   deploy:
     needs: test
