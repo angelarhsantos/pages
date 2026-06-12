@@ -15,6 +15,12 @@
       --border: #d8dce2;
       --accent: #0f766e;
       --accent-soft: #e5f4f1;
+      --success: #15803d;
+      --success-soft: #eaf7ee;
+      --failure: #b42318;
+      --failure-soft: #fff0ed;
+      --flaky: #ca8a04;
+      --flaky-soft: #fef9c3;
       --shadow: 0 12px 34px rgb(31 35 40 / 0.08);
     }
 
@@ -83,8 +89,24 @@
       padding: 1rem;
       background: var(--surface);
       border: 1px solid var(--border);
+      border-left: 0.4rem solid var(--border);
       border-radius: 0.5rem;
       box-shadow: var(--shadow);
+    }
+
+    .report[data-status="passed"] {
+      border-left-color: var(--success);
+      background: linear-gradient(90deg, var(--success-soft), var(--surface) 42%);
+    }
+
+    .report[data-status="failed"] {
+      border-left-color: var(--failure);
+      background: linear-gradient(90deg, var(--failure-soft), var(--surface) 42%);
+    }
+
+    .report[data-status="flaky"] {
+      border-left-color: var(--flaky);
+      background: linear-gradient(90deg, var(--flaky-soft), var(--surface) 42%);
     }
 
     .report a {
@@ -116,6 +138,37 @@
       font-weight: 700;
     }
 
+    .report-badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+
+    .result-badge {
+      padding: 0.35rem 0.6rem;
+      background: #f2f4f7;
+      color: var(--muted);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .result-passed {
+      background: var(--success-soft);
+      color: var(--success);
+    }
+
+    .result-failed {
+      background: var(--failure-soft);
+      color: var(--failure);
+    }
+
+    .result-flaky {
+      background: var(--flaky-soft);
+      color: var(--flaky);
+    }
+
     .empty,
     .error {
       padding: 1rem;
@@ -136,6 +189,10 @@
       .badge {
         width: fit-content;
       }
+
+      .report-badges {
+        justify-content: flex-start;
+      }
     }
   </style>
 </head>
@@ -149,104 +206,11 @@
       </p>
     </header>
 
-    <p id="status" class="status" role="status">Loading reports...</p>
+    <p id="status" class="status" role="status">Loading latest runs...</p>
     <ol id="reports" class="reports" aria-label="Latest Playwright reports"></ol>
   </main>
 
-  <script>
-    const owner = "angelarhsantos";
-    const repo = "pages";
-    const branch = "reports";
-    const reportsPath = "reports/main";
-    const maxReports = 10;
-
-    const statusElement = document.querySelector("#status");
-    const reportsElement = document.querySelector("#reports");
-
-    loadReports();
-
-    async function loadReports() {
-      try {
-        const url = `https://api.github.com/repos/${owner}/${repo}/contents/${reportsPath}?ref=${branch}`;
-        const response = await fetch(url, {
-          headers: { Accept: "application/vnd.github+json" },
-        });
-
-        if (!response.ok) {
-          throw new Error(`GitHub returned ${response.status}`);
-        }
-
-        const entries = await response.json();
-        const reports = entries
-          .filter((entry) => entry.type === "dir")
-          .filter((entry) => /^run-\d+-\d{14}$/.test(entry.name))
-          .sort((left, right) => getTimestamp(right.name).localeCompare(getTimestamp(left.name)))
-          .slice(0, maxReports);
-
-        renderReports(reports);
-      } catch (error) {
-        statusElement.textContent = "";
-        reportsElement.innerHTML = `
-            <li class="error">
-              Reports could not be loaded. Open the reports/main folder directly or try again later.
-            </li>
-          `;
-      }
-    }
-
-    function renderReports(reports) {
-      if (reports.length === 0) {
-        statusElement.textContent = "";
-        reportsElement.innerHTML = `<li class="empty">No reports have been saved yet.</li>`;
-        return;
-      }
-
-      statusElement.textContent = `Showing the latest ${reports.length} reports.`;
-
-      reportsElement.innerHTML = reports
-        .map((report, index) => {
-          const details = parseReportName(report.name);
-          const href = `${reportsPath}/${report.name}/index.html`;
-          const badge = index === 0 ? `<span class="badge">Latest</span>` : "";
-
-          return `
-              <li class="report">
-                <div>
-                  <a href="${href}">Run #${details.runNumber}</a>
-                  <div class="meta">${details.dateLabel}</div>
-                </div>
-                ${badge}
-              </li>
-            `;
-        })
-        .join("");
-    }
-
-    function parseReportName(name) {
-      const [, runNumber, timestamp] = name.match(/^run-(\d+)-(\d{14})$/);
-      const year = timestamp.slice(0, 4);
-      const month = timestamp.slice(4, 6);
-      const day = timestamp.slice(6, 8);
-      const hour = timestamp.slice(8, 10);
-      const minute = timestamp.slice(10, 12);
-      const second = timestamp.slice(12, 14);
-
-      const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
-
-      return {
-        runNumber,
-        dateLabel: date.toLocaleString(undefined, {
-          dateStyle: "medium",
-          timeStyle: "short",
-          timeZoneName: "short",
-        }),
-      };
-    }
-
-    function getTimestamp(name) {
-      return name.match(/^run-\d+-(\d{14})$/)?.[1] ?? "";
-    }
-  </script>
+  <script src="reports.js" defer></script>
 </body>
 
 </html>
