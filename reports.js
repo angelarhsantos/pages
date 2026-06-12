@@ -1,6 +1,6 @@
 const owner = "angelarhsantos";
 const repo = "pages";
-const branch = "main";
+const branch = "reports";
 const reportsPath = "reports/main";
 const maxReports = 25;
 const pagesBaseUrl = "https://angelarhsantos.github.io/pages";
