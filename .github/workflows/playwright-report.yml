@@ -46,7 +46,8 @@ jobs:
           git fetch origin reports:reports
           git worktree add reports-history reports
 
-          report_name="run-${GITHUB_RUN_NUMBER}-${time:now:yyyyMMddHHmmss}"
+          timestamp="$(date -u +'%Y%m%d%H%M%S')"
+          report_name="run-${GITHUB_RUN_NUMBER}-${timestamp}"
           report_dir="reports/main/${report_name}"
 
           cd reports-history
